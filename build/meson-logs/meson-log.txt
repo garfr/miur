@@ -1,0 +1,44 @@
+Build started at 2022-03-25T13:10:37.289529
+Main binary: C:\Program Files\Meson\meson.exe
+Build Options: -Dbackend=ninja
+Python system: Windows
+The Meson build system
+Version: 0.59.1
+Source dir: C:\Users\abele\Documents\miur
+Build dir: C:\Users\abele\Documents\miur\build
+Build type: native build
+Project name: miur
+Project version: undefined
+C compiler for the host machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
+C linker for the host machine: link link 14.30.30706.0
+C compiler for the build machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
+C linker for the build machine: link link 14.30.30706.0
+Build machine cpu family: x86_64
+Build machine cpu: x86_64
+Host machine cpu family: x86_64
+Host machine cpu: x86_64
+Target machine cpu family: x86_64
+Target machine cpu: x86_64
+
+Executing subproject cwin 
+
+Project name: cwin
+Project version: undefined
+C compiler for the host machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
+C linker for the host machine: link link 14.30.30706.0
+C compiler for the build machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
+C linker for the build machine: link link 14.30.30706.0
+Dependency vulkan found: YES unknown (cached)
+Build targets in project: 2
+Subproject cwin finished.
+
+Dependency vulkan found: YES unknown (cached)
+Configuring gpu_config.h using configuration
+Build targets in project: 3
+
+miur undefined
+
+  Subprojects
+    cwin: YES
+
+Found ninja-1.10.2 at C:\tools\ninja.EXE
