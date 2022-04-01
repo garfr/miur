@@ -1,1 +1,0 @@
-[{"name": "vulkan", "version": "unknown", "compile_args": ["-IC:\\VulkanSDK\\1.3.204.1\\Include"], "link_args": ["-LC:\\VulkanSDK\\1.3.204.1\\Lib", "-lvulkan-1"]}]
