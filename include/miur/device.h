@@ -12,7 +12,8 @@
 
 #include <miur/render_priv.h>
 
-VkInstance create_vulkan_instance(RendererBuilder *builder);
+VkInstance create_vulkan_instance(RendererBuilder *builder, 
+    VkDebugUtilsMessengerEXT *messenger);
 
 VkPhysicalDevice select_vulkan_physical_device(VkInstance vk,
                                                VkSurfaceKHR surface,

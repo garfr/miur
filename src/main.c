@@ -28,7 +28,6 @@ int main(int argc, char *argv[])
   bool running = true;
   StaticModel cube;
   enum cwin_error err;
-  MIUR_LOG_INFO("Running MIUR");
 
   err = cwin_init();
   if (err)
@@ -39,6 +38,8 @@ int main(int argc, char *argv[])
 
   struct cwin_window_builder window_builder = {
     .name = "Miur Test",
+    .height = 300,
+    .width = 300,
   };
 
   err = cwin_create_window(&window, &window_builder);
@@ -53,6 +54,7 @@ int main(int argc, char *argv[])
     .name = "Miur Test",
     .version = 1,
     .technique_filename = "../assets/technique.json",
+    .effect_filename = "../assets/effect.json",
   };
 
   render = renderer_create(&renderer_builder);
@@ -83,8 +85,14 @@ int main(int argc, char *argv[])
         running = false;
       }
     }
-    renderer_draw(render);
+    if (!renderer_draw(render))
+    {
+      MIUR_LOG_ERR("Failed to draw frame");
+      running = false;
+    }
   }
+
+  cwin_destroy_window(window);
 
   renderer_deinit_static_mesh(render, &cube.meshes[0]);
 

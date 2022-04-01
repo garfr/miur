@@ -30,14 +30,41 @@ bool create_buffer(Renderer *render, VkDeviceSize size,
 void draw_triangle_callback(void *ud, VkCommandBuffer *buffer)
 {
   Renderer *render = (Renderer *) ud;
-  
+  StaticMesh *mesh = render->mesh;
+  Material *mat = mesh->material;
+  Effect *effect = mat->effect;
+  Technique *tech = effect->techniques.forward;
+  vkCmdBindPipeline(*buffer,
+      VK_PIPELINE_BIND_POINT_GRAPHICS,
+      tech->pipeline);
+
+  VkDeviceSize offsets[] = {0, 0};
+  VkViewport viewport = {
+    .x = 0,
+    .y = 0,
+    .width = (float) render->swapchain.extent.width,
+    .height = (float) render->swapchain.extent.height,
+    .minDepth = 0.0f,
+    .maxDepth = 1.0f,
+  };
+
+  VkRect2D scissor = {
+    .offset = {0, 0},
+    .extent = render->swapchain.extent,
+  };
+
+  vkCmdSetViewport(*buffer, 0, 1, &viewport);
+  vkCmdSetScissor(*buffer, 0, 1, &scissor);
+
+  vkCmdBindVertexBuffers(*buffer, 0, 2, mesh->vert_bufs, offsets);
+  vkCmdDraw(*buffer, 3, 1, 0, 0);
 }
 
 void clear_color_triangle_callback(void *ud, VkClearColorValue *color)
 {
   if (color != NULL)
   {
-    color->float32[0] = 1.0f;
+    color->float32[0] = 0.0f;
     color->float32[1] = 0.0f;
     color->float32[2] = 0.0f;
     color->float32[3] = 0.0f;
@@ -61,7 +88,7 @@ Renderer *renderer_create(RendererBuilder *builder)
 
   render->current_frame = 0;
 
-  render->vk = create_vulkan_instance(builder);
+  render->vk = create_vulkan_instance(builder, &render->vk_messenger);
   if (!render->vk)
   {
     goto cleanup;
@@ -102,14 +129,18 @@ Renderer *renderer_create(RendererBuilder *builder)
 
   if (!create_vulkan_swapchain(&render->swapchain, render->pdev, render->dev,
                                render->surface, width, height,
-                               (uint32_t *) &render->queue_indices))
+                               (uint32_t *) &render->queue_indices, NULL))
   {
     goto cleanup;
   }
+
   MIUR_LOG_INFO("Created Vulkan swapchain");
 
   shader_cache_create(&render->shader_cache, &render->dev);
   technique_cache_create(&render->technique_cache);
+  effect_cache_create(&render->effect_cache);
+  material_cache_create(&render->material_cache);
+
   RenderGraphBuilder render_graph_builder = {
     .present_format = render->swapchain.format.format,
     .device = render->dev,
@@ -150,19 +181,58 @@ Renderer *renderer_create(RendererBuilder *builder)
     goto cleanup;
   }
 
-  TechniqueLoadError technique_error;
-  if (!technique_cache_load_technique_file(&render->technique_cache,
-                                           &render->shader_cache,
-                                           technique_config, &technique_error))
+  ParseError technique_error;
+  if (!technique_cache_load_file(render->dev, render->swapchain.extent, 
+                                 render->swapchain.format.format,
+                                 &render->technique_cache, 
+                                 &render->shader_cache, technique_config, 
+                                 &technique_error))
   {
-    MIUR_LOG_ERR("Error parsing technique config fiel '%s'\n%d:%d: %s",
+    MIUR_LOG_ERR("Error parsing technique config file '%s'\n%d:%d: %s",
                  builder->technique_filename, technique_error.line,
                  technique_error.col, technique_error.msg);
     goto cleanup;
   }
 
+  Membuf effect_config;
+  if (!membuf_load_file(&effect_config, builder->effect_filename))
+  {
+    MIUR_LOG_ERR("Failed to load effectconfig: '%s'",
+                   builder->effect_filename);
+    goto cleanup;
+  }
+
+  ParseError effect_error;
+  if (!effect_cache_load_file(render->dev, &render->effect_cache,
+                              &render->technique_cache,
+                              effect_config, &effect_error))
+  {
+    MIUR_LOG_ERR("Error parsing effect config file '%s'\n%d:%d: %s",
+                 builder->effect_filename, effect_error.line,
+                 effect_error.col, effect_error.msg);
+    goto cleanup;
+  }
+
+  String triangle_str = string_from_cstr("triangle");
+  Effect *triangle_effect = effect_cache_lookup(&render->effect_cache, 
+      &triangle_str);
+
+  material_cache_add(&render->material_cache, triangle_effect, &triangle_str);
   if (!create_sync_objects(render))
   {
+    goto cleanup;
+  }
+
+  render->shader_monitor = fs_monitor_create();
+  if (render->shader_monitor == NULL)
+  {
+    MIUR_LOG_ERR("Failed to create file system monitor for shaders");
+    goto cleanup;
+  }
+
+  if (!fs_monitor_add_dir(render->shader_monitor, "../shaders"))
+  {
+    MIUR_LOG_ERR("Failed to monitor shader directory");
     goto cleanup;
   }
 
@@ -182,6 +252,8 @@ void renderer_destroy(Renderer *render)
   shader_cache_destroy(&render->shader_cache);
   technique_cache_destroy(&render->technique_cache);
 
+  fs_monitor_destroy(render->shader_monitor);
+
   destroy_vulkan_swapchain(&render->swapchain, render->dev);
 
   render_graph_destroy(&render->render_graph);
@@ -197,14 +269,19 @@ void renderer_destroy(Renderer *render)
 
   vkDestroyDevice(render->dev, NULL);
   vkDestroySurfaceKHR(render->vk, render->surface, NULL);
+  PFN_vkDestroyDebugUtilsMessengerEXT destroy_func = 
+    (PFN_vkDestroyDebugUtilsMessengerEXT) 
+    vkGetInstanceProcAddr(render->vk, "vkDestroyDebugUtilsMessengerEXT");
+  if (destroy_func == NULL)
+  {
+    MIUR_LOG_WARN("Failed to find function 'vkDestroyDebugUtilsMessengerEXT'");
+  } else
+  {
+    destroy_func(render->vk, render->vk_messenger, NULL);
+  }
+
   vkDestroyInstance(render->vk, NULL);
   MIUR_FREE(render);
-}
-
-void renderer_configure(Renderer *render, RendererConfigure *cofigure)
-{
-
-//  cleanup_swapchain(render);
 }
 
 bool renderer_init_static_mesh(Renderer *render, StaticMesh *mesh)
@@ -249,11 +326,20 @@ bool renderer_init_static_mesh(Renderer *render, StaticMesh *mesh)
   memcpy(data, mesh->indices, buffer_size);
   vkUnmapMemory(render->dev, mesh->index_memory);
 
+  String material_name = string_from_cstr("triangle");
+  render->mesh->material = material_cache_lookup(&render->material_cache, &material_name);
+  if (render->mesh->material == NULL)
+  {
+    MIUR_LOG_ERR("Couldn't find material: '%.*s'", (int) material_name.size, 
+       material_name.data);
+    return false;
+  }
   return true;
 }
 
 void renderer_deinit_static_mesh(Renderer *render, StaticMesh *mesh)
 {
+  vkDeviceWaitIdle(render->dev);
   vkDestroyBuffer(render->dev, mesh->vert_bufs[0], NULL);
   vkDestroyBuffer(render->dev, mesh->vert_bufs[1], NULL);
   vkDestroyBuffer(render->dev, mesh->index_buf, NULL);
@@ -263,8 +349,34 @@ void renderer_deinit_static_mesh(Renderer *render, StaticMesh *mesh)
 }
 
 bool do_recreate = false;
-void renderer_draw(Renderer *render)
+bool renderer_draw(Renderer *render)
 {
+  size_t ev_size;
+  FsMonitorEvent *evs = fs_monitor_get_events(render->shader_monitor, &ev_size);
+
+  for (size_t i = 0; i < ev_size; i++)
+  {
+    FsMonitorEvent *ev = evs + i;
+    switch (ev->t)
+    {
+      case FS_MONITOR_EVENT_MODIFY:
+      {
+        String str = string_from_cstr(ev->path);
+        ShaderModule *mod = shader_cache_lookup(&render->shader_cache, &str);
+        if (mod != NULL)
+        {
+          MIUR_LOG_INFO("updating shader: %s", ev->path);
+          shader_cache_reload_shader(render->dev, &render->shader_cache, mod, ev->path);
+          material_cache_rebuild(render->dev, render->swapchain.extent, 
+              render->swapchain.format.format, &render->material_cache, 
+              &render->effect_cache, &render->technique_cache, mod);
+        }
+      }
+    }
+  }
+
+  fs_monitor_release_events(render->shader_monitor);
+
   VkResult err;
 
   vkWaitForFences(render->dev, 1, &render->inflight_fences[render->current_frame],
@@ -280,32 +392,16 @@ void renderer_draw(Renderer *render)
     do_recreate = true;
   } else if (err)
   {
+    MIUR_LOG_ERR("Failed to acquire next swapchain image");
     print_vulkan_error(err);
-    return;
+    return false;
   }
 
-  if (!render_graph_draw(&render->render_graph, render->current_frame))
+  if (!render_graph_draw(&render->render_graph, render->current_frame, render->image_index))
   {
     MIUR_LOG_ERR("Failed to draw render graph");
-    return;
+    return false;
   }
-
-/*   vkCmdBindPipeline(render->command_buffers[render->current_frame], */
-/*                     VK_PIPELINE_BIND_POINT_GRAPHICS, */
-/*                     render->techniques[0].pipeline); */
-/*   VkDeviceSize offsets[] = {0, 0}; */
-
-/*   vkCmdBindVertexBuffers(render->command_buffers[render->current_frame], */
-/*                          0, 2, render->mesh->vert_bufs, offsets); */
-/*   vkCmdBindIndexBuffer(render->command_buffers[render->current_frame], */
-/*                        render->mesh->index_buf, 0, VK_INDEX_TYPE_UINT16); */
-
-/*   vkCmdDrawIndexed(render->command_buffers[render->current_frame], */
-/*                    6, */
-/* //                   render->mesh->index_count, */
-/*                    1, 0, 0, 0); */
-/* //  vkCmdDraw(render->command_buffers[render->current_frame], 3, 1, 0, 0); */
-/*   vkCmdEndRenderPass(render->command_buffers[render->current_frame]); */
 
   VkPipelineStageFlags wait_stages[] = {
     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -328,8 +424,9 @@ void renderer_draw(Renderer *render)
 
   if (err)
   {
+    MIUR_LOG_ERR("Failed to submit queues");
     print_vulkan_error(err);
-    return;
+    return false;
   }
 
   VkPresentInfoKHR present_info = {
@@ -354,9 +451,17 @@ void renderer_draw(Renderer *render)
 
   if (do_recreate)
   {
-    recreate_swapchain(render);
+    if (!recreate_swapchain(render))
+    {
+      MIUR_LOG_ERR("Failed to recreate swapchain");
+      return false;
+    }
+    render_graph_resize(&render->render_graph, render->swapchain.extent, 
+        render->swapchain.format.format, render->swapchain.image_views, 
+        render->swapchain.image_count);
     do_recreate = false;
   }
+  return true;
 }
 
 void print_vulkan_error(VkResult err)
@@ -417,9 +522,13 @@ recreate_swapchain(Renderer *render)
   cwin_window_get_size_pixels(render->window, &width, &height);
   Swapchain new = {0};
 
-  create_vulkan_swapchain(&new, render->pdev, render->dev,
-                          render->surface, width, height,
-                          (uint32_t *) &render->queue_indices);
+  if (!create_vulkan_swapchain(&new, render->pdev, render->dev,
+                               render->surface, width, height,
+                               (uint32_t *) &render->queue_indices, &old))
+  {
+    return false;
+  }
+
   render->swapchain = new;
 
   vkDeviceWaitIdle(render->dev);

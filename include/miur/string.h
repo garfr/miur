@@ -19,6 +19,7 @@ typedef struct
 } String;
 
 bool string_eq(String *str1, String *str2);
+bool string_cstr_eq(String *str, const char *cstr);
 uint32_t string_hash(String *str);
 void string_print(String *str);
 void string_libc_destroy(void *ud, String *str);

@@ -495,7 +495,7 @@ String json_get_string(JsonStream *stream, JsonTok tok)
 {
   String str = {
     .data = stream->buf.data + tok.start,
-    .size = tok.end - tok.start,
+    .size = tok.end - (tok.start),
   };
   return str;
 }
@@ -516,4 +516,11 @@ void json_get_position_info(JsonStream *stream, JsonTok tok, int *line_out,
   }
   *line_out = line;
   *col_out = col;
+}
+
+bool json_streq(JsonStream *stream, JsonTok tok, const char *cstr)
+{
+  String str = json_get_string(stream, tok);
+  size_t size = strlen(cstr);
+  return str.size == size && strncmp(cstr, str.data, size) == 0;
 }

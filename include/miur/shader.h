@@ -34,6 +34,9 @@ typedef struct
 
 void shader_cache_create(ShaderCache *cache_out, VkDevice *dev);
 void shader_cache_destroy(ShaderCache *cache);
+ShaderModule *shader_cache_lookup(ShaderCache *cache, String *str);
+bool shader_cache_reload_shader(VkDevice dev, ShaderCache *cache, 
+    ShaderModule *module, const char *path);
 ShaderModule *shader_cache_load(VkDevice dev, ShaderCache *cache,
                                 String *str);
 #endif

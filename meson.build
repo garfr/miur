@@ -16,18 +16,16 @@ src = [
     'src/material.c',
     'src/render_graph.c',
     'src/json.c',
-
-    'deps/cJSON.c',
+    'src/thread.c',
+    'src/fs_monitor.c',
 ]
 
 warning_level = 3
+
 deps_path = meson.current_source_dir() / 'deps'
 
 deps_path = meson.current_source_dir() / 'deps'
 deps_inc = include_directories(deps_path)
-
-cglm_path = meson.current_source_dir() / 'deps/cglm/include'
-cglm_inc = include_directories(cglm_path)
 
 cwin = subproject('cwin').get_variable('cwin_dep')
 
@@ -45,5 +43,5 @@ inc = include_directories('include')
 
 executable('miur',
            src,
-           include_directories : [conf, inc, deps_inc, cglm_inc],
+           include_directories : [conf, inc, deps_inc],
            dependencies : deps)

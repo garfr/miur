@@ -119,7 +119,7 @@ void render_graph_destroy(RenderGraph *graph)
   {
     BakedRenderPass *pass = &graph->baked_passes.arr[i];
     vkDestroyRenderPass(graph->device, pass->vk_pass, NULL);
-    for (uint32_t j = 0; j < graph->max_frames_in_flight; j++)
+    for (uint32_t j = 0; j < graph->present_image_count; j++)
     {
       vkDestroyFramebuffer(graph->device, pass->framebuffers[j],
                            NULL);
@@ -158,9 +158,8 @@ RenderPass *render_graph_add_pass(RenderGraph *graph, String _str)
   return pass;
 }
 
-bool render_graph_draw(RenderGraph *graph, int frame)
+bool render_graph_draw(RenderGraph *graph, int frame, int image_index)
 {
-  MIUR_LOG_INFO("frame: %d", frame);
   VkResult err;
 
   vkResetCommandBuffer(graph->command_buffers[frame], 0);
@@ -189,12 +188,10 @@ bool render_graph_draw(RenderGraph *graph, int frame)
       pass->pass->clear_color_callback(NULL, &clear.color);
     }
 
-    MIUR_LOG_INFO("%p", (void*) pass->framebuffers[frame]);
-
     VkRenderPassBeginInfo render_pass_begin_info = {
       .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
       .renderPass = pass->vk_pass,
-      .framebuffer = pass->framebuffers[frame],
+      .framebuffer = pass->framebuffers[image_index],
       .renderArea = {
         .offset = {0, 0},
         .extent = graph->present_extent,
@@ -257,6 +254,94 @@ void render_graph_set_present(RenderGraph *graph, RenderGraphTexture *tex)
   tex->views = graph->present_image_views;
 }
 
+bool bake_render_pass(RenderGraph *graph, BakedRenderPass *baked)
+{
+  VkResult err;
+  RenderPass *pass = baked->pass;
+  size_t attachment_count = pass->color_outputs.size;
+  VkAttachmentDescription *attachments = MIUR_ARR(VkAttachmentDescription,
+                                                  attachment_count);
+
+  VkAttachmentReference *attachment_refs = MIUR_ARR(VkAttachmentReference,
+                                                    pass->color_outputs.size);
+
+
+  for (size_t j = 0; j < pass->color_outputs.size; j++)
+  {
+    attachment_refs[j].attachment = j;
+    attachment_refs[j].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    attachments[j].format = pass->color_outputs.arr[j]->format;
+    attachments[j].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[j].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[j].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[j].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[j].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[j].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[j].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  }
+
+  VkSubpassDescription subpass = {
+    .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+    .colorAttachmentCount = pass->color_outputs.size,
+    .pColorAttachments = attachment_refs,
+  };
+
+  VkSubpassDependency subpass_dependency = {
+    .srcSubpass = VK_SUBPASS_EXTERNAL,
+    .dstSubpass = 0,
+    .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    .srcAccessMask = 0,
+    .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+  };
+
+  VkRenderPassCreateInfo create_info = {
+    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .attachmentCount = attachment_count,
+    .pAttachments = attachments,
+    .subpassCount = 1,
+    .pSubpasses = &subpass,
+    .dependencyCount = 1,
+    .pDependencies = &subpass_dependency,
+  };
+
+  vkCreateRenderPass(graph->device, &create_info, NULL,
+                     &baked->vk_pass);
+
+  baked->framebuffers = MIUR_ARR(VkFramebuffer, graph->present_image_count);
+  for (size_t i = 0; i < graph->present_image_count; i++)
+  {
+    VkImageView *views = MIUR_ARR(VkImageView, attachment_count);
+    for (size_t j = 0; j < pass->color_outputs.size; j++)
+    {
+      views[j] = pass->color_outputs.arr[j]->views[i];
+    }
+
+    VkFramebufferCreateInfo framebuffer_create_info = {
+      .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .renderPass = baked->vk_pass,
+      .attachmentCount = attachment_count,
+      .pAttachments = views,
+      .width = graph->present_extent.width,
+      .height = graph->present_extent.height,
+      .layers = 1,
+    };
+
+    err = vkCreateFramebuffer(graph->device, &framebuffer_create_info,
+                              NULL, &baked->framebuffers[i]);
+    if (err)
+    {
+      print_vulkan_error(err);
+      return false;
+    }
+  }
+
+  MIUR_FREE(attachments);
+  MIUR_FREE(attachment_refs);
+  return true;
+}
+
 bool render_graph_bake(RenderGraph *graph)
 {
   VkResult err;
@@ -272,91 +357,33 @@ bool render_graph_bake(RenderGraph *graph)
   for (size_t i = 0; i < graph->baked_passes.size; i++)
   {
     BakedRenderPass *baked = &graph->baked_passes.arr[i];
-    RenderPass *pass = baked->pass;
-    size_t attachment_count = pass->color_outputs.size;
-    VkAttachmentDescription *attachments = MIUR_ARR(VkAttachmentDescription,
-                                                    attachment_count);
-
-    VkAttachmentReference *attachment_refs = MIUR_ARR(VkAttachmentReference,
-                                                      pass->color_outputs.size);
-
-
-    for (size_t j = 0; j < pass->color_outputs.size; j++)
-    {
-      attachment_refs[j].attachment = j;
-      attachment_refs[j].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-      attachments[j].format = pass->color_outputs.arr[j]->format;
-      attachments[j].samples = VK_SAMPLE_COUNT_1_BIT;
-      attachments[j].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      attachments[j].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-      attachments[j].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      attachments[j].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      attachments[j].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-      attachments[j].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    }
-
-    VkSubpassDescription subpass = {
-      .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-      .colorAttachmentCount = pass->color_outputs.size,
-      .pColorAttachments = attachment_refs,
-    };
-
-    VkSubpassDependency subpass_dependency = {
-      .srcSubpass = VK_SUBPASS_EXTERNAL,
-      .dstSubpass = 0,
-      .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-      .srcAccessMask = 0,
-      .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-      .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-    };
-
-    VkRenderPassCreateInfo create_info = {
-      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .attachmentCount = attachment_count,
-      .pAttachments = attachments,
-      .subpassCount = 1,
-      .pSubpasses = &subpass,
-      .dependencyCount = 1,
-      .pDependencies = &subpass_dependency,
-    };
-
-    vkCreateRenderPass(graph->device, &create_info, NULL,
-                       &baked->vk_pass);
-
-
-    baked->framebuffers = MIUR_ARR(VkFramebuffer, graph->max_frames_in_flight);
-    for (size_t i = 0; i < graph->max_frames_in_flight; i++)
-    {
-      VkImageView *views = MIUR_ARR(VkImageView, attachment_count);
-      for (size_t j = 0; j < pass->color_outputs.size; j++)
-      {
-        views[j] = pass->color_outputs.arr[j]->views[i];
-      }
-
-      VkFramebufferCreateInfo framebuffer_create_info = {
-        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-        .renderPass = baked->vk_pass,
-        .attachmentCount = attachment_count,
-        .pAttachments = views,
-        .width = graph->present_extent.width,
-        .height = graph->present_extent.height,
-        .layers = 1,
-      };
-
-      err = vkCreateFramebuffer(graph->device, &framebuffer_create_info,
-                                NULL, &baked->framebuffers[i]);
-      if (err)
-      {
-        print_vulkan_error(err);
-        return false;
-      }
-    }
-
-    MIUR_FREE(attachments);
-    MIUR_FREE(attachment_refs);
+    bake_render_pass(graph, baked);
   }
   return true;
+}
+
+void render_graph_resize(RenderGraph *graph, VkExtent2D present_extent, 
+    VkFormat present_format, VkImageView *present_image_views, 
+    size_t present_image_count)
+{
+  size_t old_present_image_count = graph->present_image_count;
+  graph->present_extent = present_extent;
+  graph->present_format = present_format;
+  graph->present_image_count = present_image_count;
+  graph->present_image_views = present_image_views;
+
+  render_graph_set_present(graph, graph->present_texture);
+
+  for (size_t i = 0; i < graph->baked_passes.size; i++)
+  {
+    BakedRenderPass *baked = &graph->baked_passes.arr[i];
+    for (size_t j = 0; j < old_present_image_count; j++)
+    {
+      vkDestroyFramebuffer(graph->device, baked->framebuffers[j], NULL);
+    }
+    vkDestroyRenderPass(graph->device, baked->vk_pass, NULL);
+    bake_render_pass(graph, baked);
+  }
 }
 
 /* === PRIVATE FUNCTIONS === */

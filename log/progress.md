@@ -167,3 +167,19 @@ able to output the normals with a vector assignment as shown
 [here](bsl-normal-triangle.png).  It is satisfying to finally be drawing
 something with my language.  It's still not useful for much besides writing
 inputs to outputs, so I will have to implement math operations and matrixes.
+
+# 3/31/2022
+
+I feel silly, I have left this log untouched for several weeks now.  I got off
+my spring break, so I guess that I have just been more busy with school and
+social interactions.  Anyway, progress has still been steady.  I implemented
+the beginnings of a material system, with effects, techniques and materials.
+I still need support for textures and descriptors, so you can't pass uniforms
+or anything as is.  I also implemented a render graph that calculates an
+efficient rendering procedure to draw different "passes", each with specified
+inputs and ouputs.  Finally, I implemented shader hot reloading on top of the
+material system, so its easy to play with hard coded values to get the look you
+want. 
+
+I will begin working on passing uniform data to shaders tomorrow, so maybe
+I can do some model/view/projection action.

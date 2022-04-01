@@ -103,10 +103,12 @@ void json_stream_deinit(JsonStream *stream);
                                                 true : (*_out =         \
                                                         JSON_NEXT(_stream), false))
 
+
 void json_print(JsonStream *stream, JsonTok tok);
 
 double json_get_number(JsonStream *stream, JsonTok tok);
 String json_get_string(JsonStream *stream, JsonTok tok);
+bool json_streq(JsonStream *stream, JsonTok tok, const char *str);
 
 void json_get_position_info(JsonStream *stream, JsonTok tok, int *line,
                             int *col);

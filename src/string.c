@@ -9,6 +9,7 @@
 
 #include <miur/string.h>
 #include <miur/mem.h>
+#include <miur/log.h>
 
 bool string_eq(String *str1, String *str2)
 {
@@ -51,4 +52,10 @@ String string_from_cstr(const char *cstr)
     .size = strlen(cstr),
   };
   return str;
+}
+
+bool string_cstr_eq(String *str, const char *cstr)
+{
+  size_t size = strlen(cstr);
+  return size == str->size && strncmp(str->data, cstr, size) == 0;
 }

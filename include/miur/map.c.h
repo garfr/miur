@@ -49,6 +49,14 @@ typedef struct
   size_t buckets_filled;
   void *ud;
 } MANGLE_TYPE(Map);
+
+typedef struct
+{
+  MANGLE_TYPE(Map) *map;
+  size_t bucket;
+  MANGLE_TYPE(MapEntry) *entry;
+} MANGLE_TYPE(MapIter);
+
 #endif
 
 #ifndef MAP_NO_FUNCTIONS
@@ -56,6 +64,8 @@ void MANGLE_FUN(create)(MANGLE_TYPE(Map) *map_out);
 void MANGLE_FUN(destroy)(MANGLE_TYPE(Map) *map);
 void MANGLE_FUN(set_user_data)(MANGLE_TYPE(Map) *map, void *ud);
 
+MANGLE_TYPE(MapIter) MANGLE_FUN(iter_create)(MANGLE_TYPE(Map) *map);
+MAP_VAL_TYPE *MANGLE_FUN(iter_next)(MANGLE_TYPE(MapIter) *iter);
 /* Returns NULL when it already exists in the map. */
 MAP_VAL_TYPE *MANGLE_FUN(insert)(MANGLE_TYPE(Map) *map, MAP_KEY_TYPE *key,
                                  MAP_VAL_TYPE *val);
@@ -162,6 +172,37 @@ uint32_t hash = MAP_HASH_FUN(key);
   }
 
   return NULL;
+}
+
+MANGLE_TYPE(MapIter) MANGLE_FUN(iter_create)(MANGLE_TYPE(Map) *map)
+{
+  MANGLE_TYPE(MapIter) iter = {
+    .map = map,
+    .bucket = 0,
+    .entry = map->buckets[0],
+  };
+  return iter;
+}
+
+MAP_VAL_TYPE *MANGLE_FUN(iter_next)(MANGLE_TYPE(MapIter) *iter)
+{
+  if (iter->entry == NULL)
+  {
+    iter->bucket++;
+    while (iter->bucket < iter->map->nbuckets && iter->map->buckets[iter->bucket] == NULL)
+    {
+      iter->bucket++;
+    }
+    if (iter->bucket >= iter->map->nbuckets)
+    {
+      return NULL;
+    } 
+    iter->entry = iter->map->buckets[iter->bucket];
+  }
+
+  MANGLE_TYPE(MapEntry) *entry = iter->entry;
+  iter->entry = iter->entry->next;
+  return &entry->val;
 }
 
 #endif

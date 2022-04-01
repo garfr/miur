@@ -33,7 +33,8 @@ typedef enum
 bool create_vulkan_swapchain(Swapchain *swapchain, VkPhysicalDevice pdev,
                              VkDevice dev,
                              VkSurfaceKHR surface, uint32_t width,
-                             uint32_t height, uint32_t *queue_indices);
+                             uint32_t height, uint32_t *queue_indices, 
+                             Swapchain *old_swapchain);
 void destroy_vulkan_swapchain(Swapchain *swapchain, VkDevice dev);
 SwapchainStatus update_vulkan_swapchain(Swapchain *swapchain,
                                         VkPhysicalDevice pdev,

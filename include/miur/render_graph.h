@@ -132,9 +132,12 @@ bool render_pass_add_input_texture(RenderGraph *graph, RenderPass *pass,
 bool render_graph_create(RenderGraph *graph, RenderGraphBuilder *builder);
 void render_graph_destroy(RenderGraph *graph);
 RenderPass *render_graph_add_pass(RenderGraph *graph, String str);
-bool render_graph_draw(RenderGraph *graph, int frame);
+bool render_graph_draw(RenderGraph *graph, int frame, int image_index);
 RenderGraphTexture *render_graph_create_texture(RenderGraph *graph, String str);
 void render_graph_set_present(RenderGraph *graph, RenderGraphTexture *tex);
 bool render_graph_bake(RenderGraph *graph);
+void render_graph_resize(RenderGraph *graph, VkExtent2D present_extent, 
+    VkFormat present_format, VkImageView *present_image_views, 
+    size_t present_image_count);
 
 #endif

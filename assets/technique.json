@@ -1,6 +1,6 @@
 {
   "triangle" : {
-    "vert": "../shaders/triangle_vert.bsl",
-    "frag": "../shaders/triangle_frag.bsl"
+    "vert" : "../shaders/triangle_vert.bsl",
+    "frag" : "../shaders/triangle_frag.bsl"
   }
 }

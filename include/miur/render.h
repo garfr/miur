@@ -21,6 +21,7 @@ typedef struct
   const char *name;
   uint32_t version;
   const char *technique_filename;
+  const char *effect_filename;
 } RendererBuilder;
 
 typedef struct
@@ -32,7 +33,7 @@ typedef uint64_t GPUTechnique;
 
 Renderer *renderer_create(RendererBuilder *builder);
 void renderer_destroy(Renderer *render);
-void renderer_draw(Renderer *render);
+bool renderer_draw(Renderer *render);
 void renderer_configure(Renderer *render, RendererConfigure *cofigure);
 
 bool renderer_init_static_mesh(Renderer *render, StaticMesh *mesh);

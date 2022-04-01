@@ -11,7 +11,13 @@
 #include <inttypes.h>
 #include <string.h>
 
-#include <spirv/spirv.h>
+#include <vulkan/vulkan.h>
+
+#if VK_HEADER_VERSION >= 135
+#include <spirv-headers/spirv.h>
+#else
+#include <vulkan/spirv.h>
+#endif
 
 #include <miur/mem.h>
 #include <miur/log.h>

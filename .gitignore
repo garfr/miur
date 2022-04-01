@@ -1,0 +1,5 @@
+build/
+subprojects/cwin
+deps/
+*.swp
+*.spv

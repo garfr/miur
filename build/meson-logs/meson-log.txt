@@ -1,18 +1,22 @@
-Build started at 2022-03-25T13:10:37.289529
+Build started at 2022-03-29T15:44:58.471617
 Main binary: C:\Program Files\Meson\meson.exe
 Build Options: -Dbackend=ninja
 Python system: Windows
 The Meson build system
-Version: 0.59.1
-Source dir: C:\Users\abele\Documents\miur
-Build dir: C:\Users\abele\Documents\miur\build
+Version: 0.55.0
+Source dir: C:\Users\garfr\Documents\miur
+Build dir: C:\Users\garfr\Documents\miur\build
 Build type: native build
+None of 'PKG_CONFIG_PATH' are defined in the environment, not changing global flags.
+None of 'PKG_CONFIG_PATH' are defined in the environment, not changing global flags.
 Project name: miur
 Project version: undefined
-C compiler for the host machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
-C linker for the host machine: link link 14.30.30706.0
-C compiler for the build machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
-C linker for the build machine: link link 14.30.30706.0
+C compiler for the build machine: cl (msvc 19.31.31105)
+C linker for the build machine: link link 14.31.31105.0
+None of 'AR' are defined in the environment, not changing global flags.
+C compiler for the host machine: cl (msvc 19.31.31105)
+C linker for the host machine: link link 14.31.31105.0
+None of 'AR' are defined in the environment, not changing global flags.
 Build machine cpu family: x86_64
 Build machine cpu: x86_64
 Host machine cpu family: x86_64
@@ -20,14 +24,16 @@ Host machine cpu: x86_64
 Target machine cpu family: x86_64
 Target machine cpu: x86_64
 
-Executing subproject cwin 
+Executing subproject cwin method meson 
 
+None of 'PKG_CONFIG_PATH' are defined in the environment, not changing global flags.
+None of 'PKG_CONFIG_PATH' are defined in the environment, not changing global flags.
 Project name: cwin
 Project version: undefined
-C compiler for the host machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
-C linker for the host machine: link link 14.30.30706.0
-C compiler for the build machine: cl (msvc 19.30.30706 "Microsoft (R) C/C++ Optimizing Compiler Version 19.30.30706 for x64")
-C linker for the build machine: link link 14.30.30706.0
+C compiler for the build machine: cl (msvc 19.31.31105)
+C linker for the build machine: link link 14.31.31105.0
+C compiler for the host machine: cl (msvc 19.31.31105)
+C linker for the host machine: link link 14.31.31105.0
 Dependency vulkan found: YES unknown (cached)
 Build targets in project: 2
 Subproject cwin finished.
@@ -41,4 +47,6 @@ miur undefined
   Subprojects
     cwin: YES
 
-Found ninja-1.10.2 at C:\tools\ninja.EXE
+Found ninja.EXE-1.10.0 at "C:\Program Files\Meson\ninja.EXE"
+None of 'STRIP' are defined in the environment, not changing global flags.
+None of 'STRIP' are defined in the environment, not changing global flags.

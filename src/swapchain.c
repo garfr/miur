@@ -12,7 +12,8 @@
 bool create_vulkan_swapchain(Swapchain *swapchain, VkPhysicalDevice pdev,
                              VkDevice dev,
                              VkSurfaceKHR surface, uint32_t width,
-                             uint32_t height, uint32_t *queue_indices)
+                             uint32_t height, uint32_t *queue_indices,
+                             Swapchain *old_swapchain)
 {
   VkSurfaceCapabilitiesKHR capabilities;
   VkResult err;
@@ -116,6 +117,11 @@ found_mailbox:
     .oldSwapchain = VK_NULL_HANDLE,
   };
 
+  if (old_swapchain != NULL)
+  {
+    swapchain_create_info.oldSwapchain = old_swapchain->swapchain;
+  }
+
   if (queue_indices[0] != queue_indices[1])
   {
     swapchain_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -130,6 +136,7 @@ found_mailbox:
                              &swapchain->swapchain);
   if (err)
   {
+    MIUR_LOG_ERR("Failed to create swapchain");
     print_vulkan_error(err);
     return false;
   }

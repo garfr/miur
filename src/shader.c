@@ -102,6 +102,54 @@ ShaderModule *shader_cache_load(VkDevice dev, ShaderCache *cache,
   return mod;
 }
 
+ShaderModule *shader_cache_lookup(ShaderCache *cache, String *str)
+{
+  return shader_map_find(&cache->map, str);
+}
+
+bool shader_cache_reload_shader(VkDevice dev, ShaderCache *cache, 
+    ShaderModule *module, const char *path)
+{
+  Membuf source;
+  /*
+  membuf_destroy(&module->code);
+  */
+  VkResult err;
+
+  if (!membuf_load_file(&source, path))
+  {
+    MIUR_LOG_ERR("Cannot open shader file: %s", path);
+    return false;
+  }
+
+  BSLCompileResult compile_result;
+  if (!bsl_compile(&compile_result, source, NULL))
+  {
+    MIUR_LOG_ERR("Failed to compile shader file '%s'\n%d%d:%s",
+                  path, compile_result.line,
+                  compile_result.column, compile_result.error);
+    return false;
+  }
+
+  module->code = compile_result.spirv;
+  vkDestroyShaderModule(dev, module->module, NULL);
+  VkShaderModuleCreateInfo shader_create_info = {
+    .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+    .codeSize = module->code.size,
+    .pCode = (uint32_t *) module->code.data,
+  };
+
+  err = vkCreateShaderModule(dev, &shader_create_info, NULL, &module->module);
+  if (err)
+  {
+    print_vulkan_error(err);
+    return false;
+  }
+
+  return true;
+}
+
+
 /* === PRIVATE FUNCTIONS === */
 
 static void shader_destroy(void *ud, ShaderModule *module)

@@ -12,7 +12,7 @@
 #include <miur/mem.h>
 #include <miur/log.h>
 
-const char *layers[] = {
+static const char *layers[] = {
   "VK_LAYER_KHRONOS_validation",
 };
 
@@ -20,7 +20,21 @@ static const char *device_extensions[] = {
   VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 };
 
-VkInstance create_vulkan_instance(RendererBuilder *builder)
+static const char *instance_extensions[] = {
+  VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+};
+
+/* === PROTOTYPES === */
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData);
+
+/* === PUBLIC FUNCTIONS === */
+
+VkInstance create_vulkan_instance(RendererBuilder *builder, VkDebugUtilsMessengerEXT *messenger_out)
 {
   VkResult err;
   VkInstance vk;
@@ -35,15 +49,20 @@ VkInstance create_vulkan_instance(RendererBuilder *builder)
   };
 
   cwin_vk_get_required_extensions(builder->window, NULL, &extension_count);
-  extensions = MIUR_ARR(const char *, extension_count);
+  size_t real_extension_count = extension_count + sizeof(instance_extensions) / sizeof(instance_extensions[0]);
+  extensions = MIUR_ARR(const char *, real_extension_count);
   cwin_vk_get_required_extensions(builder->window, extensions,
                                   &extension_count);
+  for (size_t i = 0; i + extension_count < real_extension_count; i++)
+  {
+    extensions[i + extension_count] = instance_extensions[i];
+  }
 
   VkInstanceCreateInfo instance_create_info = {
     .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
     .pApplicationInfo = &app_info,
     .ppEnabledExtensionNames = extensions,
-    .enabledExtensionCount = extension_count,
+    .enabledExtensionCount = real_extension_count,
     .ppEnabledLayerNames = layers,
     .enabledLayerCount = sizeof(layers) / sizeof(layers[0]),
   };
@@ -57,6 +76,38 @@ VkInstance create_vulkan_instance(RendererBuilder *builder)
   }
 
   MIUR_FREE(extensions);
+
+  VkDebugUtilsMessengerCreateInfoEXT messenger_create_info = {
+    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+    .messageSeverity = 
+    //  VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | 
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+    .messageType = 
+      VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | 
+//      VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+      VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
+    .pfnUserCallback = debug_callback,
+    .pUserData = NULL,
+  };
+
+  PFN_vkCreateDebugUtilsMessengerEXT create_debug_function = 
+    (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(vk, "vkCreateDebugUtilsMessengerEXT");
+  if (create_debug_function != NULL)
+  {
+    err = create_debug_function(vk, &messenger_create_info, NULL, 
+        messenger_out);
+    if (err)
+    {
+      print_vulkan_error(err);
+      return VK_NULL_HANDLE;
+    }
+  } else
+  {
+    MIUR_LOG_WARN("Failed to find 'vkCreateDebugUtilsMessengerEXT'");
+    return vk;
+  } 
+
   return vk;
 }
 
@@ -218,4 +269,16 @@ VkDevice create_vulkan_device(VkPhysicalDevice pdev, VkQueue *graphics_queue,
   vkGetDeviceQueue(dev, graphics_index, 0, graphics_queue);
 
   return dev;
+}
+
+/* === PRIVATE FUNCTIONS === */
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+  MIUR_LOG_ERR("Validation error: %s", pCallbackData->pMessage);
+  return VK_FALSE;
 }
