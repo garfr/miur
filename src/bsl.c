@@ -1944,7 +1944,6 @@ const char gl450_spirv_extension[] = "GLSL.std.450";
 
 bool pack_spirv(BSLParser *parser)
 {
-
   size_t init_size = sizeof(spirv_init) / sizeof(uint32_t);
   size_t extension_size = 2 + ((sizeof(gl450_spirv_extension) + 3) / 4);
   size_t memory_model_size = 3;

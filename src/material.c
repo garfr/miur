@@ -514,13 +514,13 @@ bool technique_build(VkDevice dev, VkExtent2D present_extent,
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
       .module = tech->shaders.vert->module,
-      .pName = "vert",
+      .pName = "main",
     },
     {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
       .module = tech->shaders.frag->module,
-      .pName = "frag",
+      .pName = "main",
     }
   }; 
 

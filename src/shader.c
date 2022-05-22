@@ -6,6 +6,7 @@
  */
 
 #include <vulkan/vulkan.h>
+#include <string.h>
 
 #include <miur/shader.h>
 #include <miur/log.h>
@@ -14,6 +15,7 @@
 /* === PROTOTYPES === */
 
 static void shader_destroy(void *ud, ShaderModule *module);
+const char *get_filename_ext(const char *filename);
 
 /* === PUBLIC FUNCTIONS === */
 
@@ -34,6 +36,7 @@ void shader_cache_create(ShaderCache *cache_out, VkDevice *dev)
 {
   shader_map_create(&cache_out->map);
   shader_map_set_user_data(&cache_out->map, dev);
+  cache_out->compiler = shaderc_compiler_initialize();
 }
 
 void shader_cache_destroy(ShaderCache *cache)
@@ -50,9 +53,11 @@ ShaderModule *shader_cache_load(VkDevice dev, ShaderCache *cache,
     ShaderModule module;
     Membuf file_contents;
     BSLCompileResult compile_result;
+    shaderc_shader_kind kind;
     VkResult err;
     uint8_t *zero_terminated = MIUR_ARR(uint8_t, str->size + 1);
     bool result;
+    shaderc_compilation_result_t glsl_result;
     memcpy(zero_terminated, str->data, str->size);
     zero_terminated[str->size] = '\0';
     result = membuf_load_file(&file_contents, zero_terminated);
@@ -61,19 +66,44 @@ ShaderModule *shader_cache_load(VkDevice dev, ShaderCache *cache,
       MIUR_FREE(zero_terminated);
       return NULL;
     }
-
-    result = bsl_compile(&compile_result, file_contents, NULL);
-    membuf_destroy(&file_contents);
-    if (!result)
+    
+    const char *extension = strrchr(zero_terminated, '.');
+    if (strcmp(extension, ".vert") == 0)
     {
-      MIUR_LOG_ERR("Failed to compile shader file '%s'\n%d%d:%s",
-                     zero_terminated, compile_result.line,
-                     compile_result.column, compile_result.error);
+      kind = shaderc_vertex_shader;
+    } else if (strcmp(extension, ".frag") == 0)
+    {
+      kind = shaderc_fragment_shader;
+    } else
+    {
+      MIUR_LOG_ERR("Unknown extension: '%s'", extension);
       MIUR_FREE(zero_terminated);
       return NULL;
     }
 
-    module.code = compile_result.spirv;
+    glsl_result = shaderc_compile_into_spv(
+      cache->compiler,
+      (char *) file_contents.data,
+      file_contents.size,
+      kind, zero_terminated, "main", 
+      NULL
+    );
+
+    membuf_destroy(&file_contents);
+    if (shaderc_result_get_compilation_status(glsl_result) != 0)
+    {
+      const char *msg = shaderc_result_get_error_message(glsl_result);
+      MIUR_LOG_ERR("Failed to compile shader file '%s'\n%s",
+                     zero_terminated, msg);
+      MIUR_FREE(zero_terminated);
+      return NULL;
+    }
+
+    module.code.size = shaderc_result_get_length(glsl_result);
+    char *new_data = MIUR_ARR(uint8_t, module.code.size);
+    const char *data = shaderc_result_get_bytes(glsl_result);
+    memcpy(new_data, data, module.code.size);
+    module.code.data = new_data;
 
     VkShaderModuleCreateInfo shader_create_info = {
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -85,7 +115,6 @@ ShaderModule *shader_cache_load(VkDevice dev, ShaderCache *cache,
     if (err)
     {
       membuf_destroy(&file_contents);
-      membuf_destroy(&compile_result.spirv);
       MIUR_FREE(zero_terminated);
       MIUR_LOG_ERR("Failed to create shader module from shader file '%s': %d",
                    zero_terminated, err);
@@ -156,4 +185,11 @@ static void shader_destroy(void *ud, ShaderModule *module)
 {
   VkDevice *dev = (VkDevice *) ud;
   vkDestroyShaderModule(*dev, module->module, NULL);
+}
+
+const char *
+get_filename_ext(const char *filename) {
+    const char *dot = strrchr(filename, '.');
+    if(!dot || dot == filename) return "";
+    return dot + 1;
 }

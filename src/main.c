@@ -20,6 +20,12 @@
 #define INIT_SCREEN_WIDTH  960
 #define INIT_SCREEN_HEIGHT 720
 
+/* === PROTOTYPES === */
+
+static void *libc_alloc(void *ptr, size_t osz, size_t nsz, void *ud);
+
+/* === PUBLIC FUNCTIONS === */
+
 int main(int argc, char *argv[])
 {
   Renderer *render;
@@ -101,3 +107,18 @@ int main(int argc, char *argv[])
   return EXIT_SUCCESS;
 }
 
+/* === PRIVATE FUNCTIONS === */
+
+static void *libc_alloc(void *ptr, size_t osz, size_t nsz, void *ud)
+{
+  if (ptr == NULL)
+  {
+    return calloc(1, nsz);
+  } else if (nsz == 0)
+  {
+    free(ptr);
+    return NULL;
+  }
+  void *res = realloc(ptr, nsz);
+  return res;
+}

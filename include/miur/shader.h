@@ -8,10 +8,11 @@
 #ifndef MIUR_SHADER_H
 #define MIUR_SHADER_H
 
+#include <vulkan/vulkan.h>
+#include <shaderc/shaderc.h>
+
 #include <miur/string.h>
 #include <miur/membuf.h>
-
-#include <vulkan/vulkan.h>
 
 typedef struct
 {
@@ -30,6 +31,7 @@ typedef struct
 typedef struct
 {
   ShaderMap map;
+  shaderc_compiler_t compiler;
 } ShaderCache;
 
 void shader_cache_create(ShaderCache *cache_out, VkDevice *dev);
