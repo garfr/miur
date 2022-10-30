@@ -139,6 +139,8 @@ ShaderModule *shader_cache_lookup(ShaderCache *cache, String *str)
 bool shader_cache_reload_shader(VkDevice dev, ShaderCache *cache, 
     ShaderModule *module, const char *path)
 {
+  shaderc_shader_kind kind;
+  shaderc_compilation_result_t glsl_result;
   Membuf source;
   /*
   membuf_destroy(&module->code);
@@ -151,16 +153,42 @@ bool shader_cache_reload_shader(VkDevice dev, ShaderCache *cache,
     return false;
   }
 
-  BSLCompileResult compile_result;
-  if (!bsl_compile(&compile_result, source, NULL))
+  const char *extension = strrchr(path, '.');
+  if (strcmp(extension, ".vert") == 0)
   {
-    MIUR_LOG_ERR("Failed to compile shader file '%s'\n%d%d:%s",
-                  path, compile_result.line,
-                  compile_result.column, compile_result.error);
-    return false;
+    kind = shaderc_vertex_shader;
+  } else if (strcmp(extension, ".frag") == 0)
+  {
+    kind = shaderc_fragment_shader;
+  } else
+  {
+    MIUR_LOG_ERR("Unknown extension: '%s'", extension);
+    return 0;
   }
 
-  module->code = compile_result.spirv;
+  glsl_result = shaderc_compile_into_spv(
+    cache->compiler,
+    (char *) source.data,
+    source.size,
+    kind, path, "main", 
+    NULL
+  );
+
+  membuf_destroy(&source);
+  if (shaderc_result_get_compilation_status(glsl_result) != 0)
+  {
+    const char *msg = shaderc_result_get_error_message(glsl_result);
+    MIUR_LOG_ERR("Failed to compile shader file '%s'\n%s",
+                    path, msg);
+    return NULL;
+  }
+
+  module->code.size = shaderc_result_get_length(glsl_result);
+  char *new_data = MIUR_ARR(uint8_t, module->code.size);
+  const char *data = shaderc_result_get_bytes(glsl_result);
+  memcpy(new_data, data, module->code.size);
+  module->code.data = new_data;
+
   vkDestroyShaderModule(dev, module->module, NULL);
   VkShaderModuleCreateInfo shader_create_info = {
     .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,

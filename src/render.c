@@ -31,6 +31,7 @@ void draw_triangle_callback(void *ud, VkCommandBuffer *buffer)
 {
   Renderer *render = (Renderer *) ud;
   StaticMesh *mesh = render->mesh;
+  MIUR_LOG_INFO("%zu", mesh->index_count);
   Material *mat = mesh->material;
   Effect *effect = mat->effect;
   Technique *tech = effect->techniques.forward;
@@ -57,7 +58,7 @@ void draw_triangle_callback(void *ud, VkCommandBuffer *buffer)
   vkCmdSetScissor(*buffer, 0, 1, &scissor);
 
   vkCmdBindVertexBuffers(*buffer, 0, 2, mesh->vert_bufs, offsets);
-  vkCmdDraw(*buffer, 3, 1, 0, 0);
+  vkCmdDraw(*buffer, 6, 1, 0, 0);
 }
 
 void clear_color_triangle_callback(void *ud, VkClearColorValue *color)
